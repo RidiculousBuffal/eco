@@ -14,12 +14,15 @@ class ROIdistillation(BaseAgent):
 
     def __init__(self, ):
         self.agent = create_agent(Config.chatOpenAI, response_format=self.ROIdisstillationModel)
+        self.embedding_model = Config.embedding_model
 
-    async def call(self, slow_code, fast_code):
+    async def call(self, slow_code, fast_code)->"ROIdisstillationModel":
         prompt = self.get_ROI_Distillation_prompt(slow_code, fast_code)
         message = HumanMessage(content=prompt)
         res = await self.agent.ainvoke(self.buildMessage([message]))
         return res[self.SR]
+
+
 
     class ROIdisstillationModel(BaseModel):
         description: str = Field(
