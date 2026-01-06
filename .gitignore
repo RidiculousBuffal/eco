@@ -1,0 +1,4 @@
+.idea/
+/eco/data/train_hq_only.jsonl
+.venv
+.env
