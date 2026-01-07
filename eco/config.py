@@ -13,3 +13,4 @@ class Config:
     embedding_model = OpenAIEmbeddings(model=os.getenv('OPENAI_EMBEDDINGS_MODEL'))
     MILVUS_URL = os.environ.get('MILVUS_URL')
     MILVUS_PORT = int(os.environ.get('MILVUS_PORT'))
+    MILVUS_TOKEN = os.environ.get('MILVUS_TOKEN')
