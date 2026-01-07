@@ -28,10 +28,7 @@ class ROIRetriever(BaseAgent):
         systemMessage = SystemMessage(content=self.SYSTEM_PROMPT)
         humanMessage = HumanMessage(content=f"```cpp\n{input_code}\n```")
         res = await self.agent.ainvoke(self.buildMessage([systemMessage,humanMessage]))
-        for m in res.get('messages',[]):
-            if isinstance(m,AIMessage):
-                return m.content
-        return None
+        return self.getAIMessageInRes(res)
     async def retrieve_from_vdb(self,performance_opt):
         return self.vector_store.similarity_search_with_score(performance_opt, 4)
 

@@ -1,4 +1,4 @@
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, AIMessage
 from langchain_milvus import Milvus
 
 from eco.config import Config
@@ -18,3 +18,9 @@ class BaseAgent:
             connection_args=self.milvus_connection_args,
             collection_name=collection_name,
         )
+
+    def getAIMessageInRes(self,res):
+        for m in res.get('messages',[]):
+            if isinstance(m,AIMessage):
+                return m.content
+        return None
