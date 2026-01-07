@@ -1,4 +1,4 @@
-import subprocess
+import asyncio
 import tempfile
 import os
 from pathlib import Path
@@ -6,42 +6,59 @@ from pathlib import Path
 
 class JoernAdvisor:
     def __init__(self):
-        self.script_path = Path(os.path.join(os.path.dirname(os.path.relpath(__file__)),'detectors.sc')).absolute().as_posix()
+        # 这里的路径处理逻辑保持不变
+        self.script_path = Path(
+            os.path.join(os.path.dirname(os.path.relpath(__file__)), 'detectors.sc')).absolute().as_posix()
         self.docker_image = "ghcr.io/joernio/joern:master"
 
-    def analyze_code(self, code: str) -> list[str]:
-
+    async def analyze_code(self, code: str) -> list[str]:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path_local = Path(tmp_dir).absolute().as_posix()
             code_file_local = Path(tmp_dir) / "input.cpp"
-            code_file_local.write_text(code,encoding='utf-8')
+
+            code_file_local.write_text(code, encoding='utf-8')
+
             mount_code = f"{tmp_path_local}:/src"
             mount_script = f"{self.script_path}:/scripts/detectors.sc"
 
             try:
-                subprocess.run([
+                parse_process = await asyncio.create_subprocess_exec(
                     "docker", "run", "--rm",
                     "-v", mount_code,
                     self.docker_image,
-                    "joern-parse", "/src/input.cpp", "--output", "/src/app.cpg"
-                ], check=True, capture_output=True, text=True)
+                    "joern-parse", "/src/input.cpp", "--output", "/src/app.cpg",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
 
-                result = subprocess.run([
+                _, stderr = await parse_process.communicate()
+
+                if parse_process.returncode != 0:
+                    raise Exception(f"Joern parse failed: {stderr.decode('utf-8')}")
+
+                analyze_process = await asyncio.create_subprocess_exec(
                     "docker", "run", "--rm",
                     "-v", mount_code,
                     "-v", mount_script,
                     self.docker_image,
                     "joern",
                     "--script", "/scripts/detectors.sc",
-                    "--param", "cpgPath=/src/app.cpg"
-                ], capture_output=True, text=True, check=True,encoding='utf-8')
+                    "--param", "cpgPath=/src/app.cpg",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
 
-                return self._parse_output(result.stdout)
+                stdout, stderr = await analyze_process.communicate()
 
-            except subprocess.CalledProcessError as e:
-                error_msg = e.stderr if e.stderr else e.stdout
-                print(f"Error during Joern analysis:\n{error_msg}")
-                return [f"Analysis failed: {error_msg}"]
+                if analyze_process.returncode != 0:
+                    error_msg = stderr.decode('utf-8')
+                    print(f"Error during Joern analysis:\n{error_msg}")
+                    return [f"Analysis failed: {error_msg}"]
+
+                return self._parse_output(stdout.decode('utf-8'))
+
+            except Exception as e:
+                return [f"Analysis encountered an error: {str(e)}"]
 
     def _parse_output(self, raw_stdout: str) -> list[str]:
         diagnoses = []
@@ -52,7 +69,7 @@ class JoernAdvisor:
         return diagnoses
 
 
-if __name__ == "__main__":
+async def main():
     advisor = JoernAdvisor()
 
     test_code = """
@@ -76,13 +93,11 @@ if __name__ == "__main__":
     }
     """
 
-    print("正在启动 Joern 容器进行分析...")
-    results = advisor.analyze_code(test_code)
+    print("正在启动 Joern 容器进行异步分析...")
+    results = await advisor.analyze_code(test_code)
     for r in results:
         print(r)
-    """
-    🔍 Method fib at lines 7 uses pure recursion.
-    🔍 Vector 'v' at line 15 is static.
-    🔍 Slow I/O detected at line 14: cin >> n
-    🔍 Slow I/O detected at line 17: cout << fib(n) << endl
-    """
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
